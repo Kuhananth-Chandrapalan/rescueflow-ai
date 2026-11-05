@@ -1,0 +1,146 @@
+name: Daily AI Engineering Auto-Merge
+on:
+  schedule:
+    - cron: '17 8 * * *'
+      timezone: 'Asia/Colombo'
+  workflow_dispatch:
+concurrency:
+  group: rescueflow-daily-agent
+  cancel-in-progress: false
+jobs:
+  develop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      task_id: ${{ steps.task.outputs.task_id }}
+      has_task: ${{ steps.task.outputs.has_task }}
+      skip: ${{ steps.existing.outputs.skip }}
+    steps:
+      - name: Checkout with no persisted credentials
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install trusted dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Skip when a previous automation PR is unresolved
+        id: existing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh pr list --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("automation/"))] | length')
+          if [ "$count" -gt 0 ]; then
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+            echo 'An earlier automation PR is still open (for example, after a failed merge); skipped to avoid conflicts'
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Select next approved milestone
+        if: steps.existing.outputs.skip == 'false'
+        id: task
+        run: python -m automation.select_task
+      - name: Generate bounded feature using free Gemini
+        if: steps.task.outputs.has_task == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODELS: gemini-3.5-flash-lite,gemini-2.5-flash-lite
+        run: python -m automation.agent
+      - name: Check change boundaries
+        if: steps.task.outputs.has_task == 'true'
+        run: python -m automation.guard_changes
+      - name: Run generated and existing tests (read-only token)
+        if: steps.task.outputs.has_task == 'true'
+        run: |
+          python -m pytest -q
+          python -m compileall -q src tests automation app.py
+      - name: Prepare source-only patch
+        if: steps.task.outputs.has_task == 'true'
+        env:
+          TASK_ID: ${{ steps.task.outputs.task_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p agent-output
+          git add -N -- src tests docs app.py
+          git diff --binary -- src tests docs app.py > agent-output/changes.patch
+          test -s agent-output/changes.patch
+          printf '%s\n' "$TASK_ID" > agent-output/task_id
+      - name: Upload patch without credentials
+        if: steps.task.outputs.has_task == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ai-proposal
+          path: agent-output/
+          retention-days: 3
+          if-no-files-found: error
+  publish:
+    needs: develop
+    if: needs.develop.result == 'success' && needs.develop.outputs.has_task == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v6
+        with:
+          name: ai-proposal
+          path: ${{ runner.temp }}/ai-proposal/
+      - name: Validate patch without executing proposed code
+        run: |
+          set -euo pipefail
+          file="${RUNNER_TEMP}/ai-proposal/changes.patch"
+          test -s "$file"
+          git apply --check "$file"
+          git apply "$file"
+          python -m automation.guard_changes
+          git diff --check
+      - name: Install trusted dependencies for independent verification
+        run: python -m pip install -r requirements.txt pytest
+
+      - name: Re-run all tests and syntax checks before publishing
+        run: |
+          set -euo pipefail
+          python -m pytest -q
+          python -m compileall -q src tests automation app.py
+          # A generated test can execute code; ensure it has not modified protected files.
+          python -m automation.guard_changes
+          git diff --check
+
+      - name: Create traceable PR and merge automatically after validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          task_id=$(cat "${RUNNER_TEMP}/ai-proposal/task_id")
+          echo "$task_id" | grep -Eq '^[a-z][a-z0-9-]{2,78}$'
+          task_title=$(python -c 'import json,sys; print(next(t["title"] for t in json.load(open("tasks/backlog.json")) if t["id"]==sys.argv[1]))' "$task_id")
+          python -m automation.mark_complete "$task_id"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          branch="automation/${task_id}-${RUN_ID}"
+          git switch -c "$branch"
+          git add -- src tests docs app.py tasks/completed.json
+          git commit -m "feat: ${task_title}"
+          head_sha=$(git rev-parse HEAD)
+          gh auth setup-git
+          git push -u origin "$branch"
+          pr_url=$(gh pr create --base main --head "$branch" --title "feat: ${task_title}" \
+            --body "Automated AI implementation of approved milestone \`${task_id}\`. Validation and tests passed in both the read-only development job and the isolated publishing job. Automated squash merge is attempted only if repository rules permit it. This is a demo research project, not an operational food-safety system.")
+          echo "Created $pr_url"
+          # No admin bypass and no automatic self-approval. Merge is refused by GitHub
+          # if protections, checks, or review requirements are not satisfied.
+          gh pr merge "$pr_url" --squash --delete-branch --match-head-commit "$head_sha"
+          echo "Merged $pr_url into main after successful validation"

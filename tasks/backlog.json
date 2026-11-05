@@ -1,0 +1,302 @@
+[
+  {
+    "id": "prediction-intervals",
+    "title": "Calibrated demand forecast intervals",
+    "instructions": "Add empirical quantile bands using a time-ordered validation window; surface lower/upper estimates in the forecast UI and document that coverage requires external validation.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "stockout-risk-scorer",
+    "title": "Stockout risk scoring",
+    "instructions": "Implement a calibrated proxy risk score based on lead time, demand projection, and stock; show probability disclaimers, tests and dashboard priority badges.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "multi-horizon-backtest",
+    "title": "True 7/14-day horizon backtesting",
+    "instructions": "Evaluate model predictions as rolled-out multi-day forecasts at historical cutoffs, without test-target leakage, and show error alongside rolling one-day MAE.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "holiday-calendar-features",
+    "title": "Regional holiday and promotion scenarios",
+    "instructions": "Add controlled holiday and promotion flags to prediction scenarios with documented limitations and tests; keep all current demos offline.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "supplier-pack-sizing",
+    "title": "Supplier pack sizes and minimum order quantity",
+    "instructions": "Extend catalog validation, reorder heuristic and UI to support integer pack multiples and minimum orders under a hard budget cap.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "multi-location-stock",
+    "title": "Multi-warehouse stock view",
+    "instructions": "Add warehouse-specific stock records, site filters and projected coverage, while preserving single-warehouse demo fallback.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "expiry-lot-priorities",
+    "title": "Expiry-lot aware waste candidates",
+    "instructions": "Accept optional FIFO inventory lots with expiry dates and report rescue candidates at lot granularity; never claim unknown expiry dates.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "demand-anomaly-monitor",
+    "title": "Demand anomaly detection",
+    "instructions": "Introduce robust anomaly detection using only historic signals, with interpretable flags and false-positive guidance.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "lead-time-uncertainty",
+    "title": "Supplier lead time uncertainty scenarios",
+    "instructions": "Model bounded lead-time variation and compare recommended order sizes across scenarios, with deterministic tests.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "scenario-compare",
+    "title": "Side-by-side planning scenarios",
+    "instructions": "Add UI to compare two budget/weather/safety scenarios and show differences in units, cost and downside risks.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "reorder-explanations",
+    "title": "Human-readable reorder reasoning",
+    "instructions": "Make each recommendation explain its demand, shelf-life, shortage and budget constraints; add tests for boundary cases.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "budget-frontier",
+    "title": "Visualize budget-to-risk tradeoff",
+    "instructions": "Build a multi-budget sensitivity chart with a coverage proxy, constraints and evaluation of monotonic behavior.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "waste-risk-prediction",
+    "title": "Estimate perishability risk",
+    "instructions": "Introduce a documented non-probabilistic waste-risk score from shelf life, forecast demand and stock, calibrated against synthetic cases.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "carbon-accounting",
+    "title": "Auditable carbon impact assumptions",
+    "instructions": "Separate carbon-factor provenance from calculation, add customizable factors and warnings about life-cycle assessment uncertainty.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "donor-recipient-matching",
+    "title": "Donation recipient matching prototype",
+    "instructions": "Build a transparent donor/recipient capacity-and-category matching heuristic using clearly synthetic beneficiaries; no automatic donation commitments.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "route-clustering",
+    "title": "Delivery cluster suggestions",
+    "instructions": "Group synthetic pickup locations into efficient geographic clusters using deterministic distance metrics, but do not claim an optimal vehicle route.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "weather-availability",
+    "title": "Weather data fallback diagnostics",
+    "instructions": "Add source freshness, latency and missing forecast fallback indicators without confusing synthetic observations with live forecasts.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "model-drift-signals",
+    "title": "Data drift monitoring",
+    "instructions": "Introduce distribution-shift indicators for incoming demand and feature values, with thresholds and a unit-tested reference window.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "explainable-insights",
+    "title": "Permutation importance and cautions",
+    "instructions": "Add permutation feature importance for the chronological holdout, compare it to impurity importance and explain why neither proves causality.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "report-export",
+    "title": "Executive decision memo export",
+    "instructions": "Build a concise HTML or Markdown export with forecast assumptions, model quality, recommendations, data provenance and review checklist.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "data-validation-report",
+    "title": "Data quality dashboard",
+    "instructions": "Display missing dates, duplicate records, schema failures and data freshness with actionable CSV correction guidance.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "recommendation-feedback",
+    "title": "Human decision feedback loop",
+    "instructions": "Record accept/reject decisions locally for recommendations, offer a CSV export and track adoption without storing personal data.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "baseline-model-comparison",
+    "title": "Transparent seasonal baseline comparison",
+    "instructions": "Compare the random forest to trailing and weekday seasonal naive forecasts on identical chronological windows.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "inventory-turnover",
+    "title": "Inventory turnover efficiency metrics",
+    "instructions": "Introduce stock coverage days and turnover proxies across SKUs and visualize tradeoffs with freshness.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "priority-fairness",
+    "title": "Recipient matching fairness checks",
+    "instructions": "For synthetic donation recipients, show transparent service equity diagnostics without assigning protected traits.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "sensitivity-testing",
+    "title": "Stress-test demand shocks",
+    "instructions": "Add explainable stockout stress tests under demand spikes and delivery delays with deterministic acceptance cases.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "uncertainty-calibration",
+    "title": "Review forecast interval coverage",
+    "instructions": "Add empirical interval coverage and width diagnostics on a clean holdout with accuracy limitations noted.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "inventory-csv-onboarding",
+    "title": "Friendly inventory CSV onboarding",
+    "instructions": "Implement downloadable schemas and more actionable row-level input errors, with tests for malformed uploads.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "forecast-cache-efficiency",
+    "title": "Accelerate scenario recomputations",
+    "instructions": "Separate model training from scenario-only inference in the Streamlit cache and add a speed/performance regression test.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  },
+  {
+    "id": "deployment-readiness",
+    "title": "Production-readiness dashboard",
+    "instructions": "Create a page tracking test status, data limitations, risks, version and required validation before real data use.",
+    "acceptance": [
+      "Implement actual feature integrated into source or dashboard rather than an unused file.",
+      "Include deterministic tests for normal and edge cases; do not weaken existing tests.",
+      "Document assumptions, model/data limits, and user-facing interpretation."
+    ]
+  }
+]
