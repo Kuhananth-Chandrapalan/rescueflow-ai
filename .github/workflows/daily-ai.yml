@@ -54,11 +54,42 @@ jobs:
       - name: Check change boundaries
         if: steps.task.outputs.has_task == 'true'
         run: python -m automation.guard_changes
-      - name: Run generated and existing tests (read-only token)
+      # AI output runs only in steps that have no Gemini key and no write token.
+      # A failing first attempt supplies feedback for ONE source-only model repair.
+      - name: Test generated feature (initial attempt)
+        if: steps.task.outputs.has_task == 'true'
+        id: initial_tests
+        run: |
+          set -uo pipefail
+          git add -N -- src tests docs app.py
+          status=0
+          python -m pytest -q > "$RUNNER_TEMP/ai-test-log.txt" 2>&1 || status=1
+          python -m compileall -q src tests automation app.py >> "$RUNNER_TEMP/ai-test-log.txt" 2>&1 || status=1
+          git diff --check >> "$RUNNER_TEMP/ai-test-log.txt" 2>&1 || status=1
+          if [ "$status" -eq 0 ]; then
+            echo 'passed=true' >> "$GITHUB_OUTPUT"
+            echo 'Initial quality checks passed'
+          else
+            echo 'passed=false' >> "$GITHUB_OUTPUT"
+            echo 'First attempt failed; sending test report to bounded source-only repair'
+            tail -n 90 "$RUNNER_TEMP/ai-test-log.txt"
+          fi
+
+      - name: Repair generated source once (no test execution with API key)
+        if: steps.task.outputs.has_task == 'true' && steps.initial_tests.outputs.passed == 'false'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODELS: gemini-3.5-flash-lite,gemini-2.5-flash-lite
+        run: python -m automation.repair --log "$RUNNER_TEMP/ai-test-log.txt"
+
+      - name: Verify generated feature after optional repair (no secrets)
         if: steps.task.outputs.has_task == 'true'
         run: |
+          set -euo pipefail
+          python -m automation.guard_changes
           python -m pytest -q
           python -m compileall -q src tests automation app.py
+          git diff --check
       - name: Prepare source-only patch
         if: steps.task.outputs.has_task == 'true'
         env:
