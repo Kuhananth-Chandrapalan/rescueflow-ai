@@ -147,6 +147,12 @@ with t1:
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=past.date, y=past.units_sold, name="Observed (synthetic)",
                                  line=dict(color="#76a7c9", width=2)))
+        # Prediction interval quantile bands (lower and upper)
+        fig.add_trace(go.Scatter(x=future.date, y=future.upper_units,
+                                 mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"))
+        fig.add_trace(go.Scatter(x=future.date, y=future.lower_units,
+                                 mode="lines", line=dict(width=0), fillcolor="rgba(120, 226, 178, 0.2)",
+                                 fill="tonexty", name="Empirical band (80%)", hoverinfo="skip"))
         fig.add_trace(go.Scatter(x=future.date, y=future.predicted_units,
                                  name="AI forecast", line=dict(color="#78e2b2", width=3)))
         fig.update_layout(height=405, template="plotly_dark", margin=dict(l=5, r=5, t=15, b=5),
@@ -163,7 +169,7 @@ with t1:
                           margin=dict(l=0, r=0, t=15, b=0),
                           paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig, use_container_width=True)
-    st.markdown('<div class="note">Forecasts use a supervised random forest trained on prior demand, calendar and weather features. Each future day uses previous predictions as lag features; uncertainty therefore compounds across the horizon.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="note">Forecasts use a supervised random forest trained on prior demand, calendar and weather features. Shaded empirical quantile bands reflect historical holdout residual spreads scaled by horizon length. External validation is required before relying on intervals for safety stock.</div>', unsafe_allow_html=True)
 
 with t2:
     st.subheader("Replenishment decision queue")
@@ -199,7 +205,7 @@ with t3:
     st.warning("Never donate solely based on this estimate. Inspect expiry dates, food handling, allergen labeling, beneficiary demand, transport, and local food-safety law.")
 
 with t4:
-    st.subheader("Rolling one-day-ahead backtest")
+    st.subheader("Rolling one-day-ahead backtest and calibration")
     a, b, c = st.columns(3)
     a.metric("Model MAE (units/day)", f"{forecasts.metrics.mae.mean():.2f}")
     b.metric("7-day mean baseline MAE", f"{forecasts.metrics.baseline_mae.mean():.2f}")
@@ -214,11 +220,11 @@ with t4:
     imp_fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
                           plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=0, r=0, t=10, b=0))
     st.plotly_chart(imp_fig, use_container_width=True)
-    st.caption("Last 28 days form the holdout. Test-day lag features use already observed previous-day demand. This does not estimate full 14-day-horizon error; multi-horizon backtesting and prediction intervals are future milestones.")
+    st.caption("Prediction intervals are constructed from empirical holdout residuals (10th to 90th quantiles) scaled by square-root time horizon. Coverage validity assumes stationary demand distributions and requires external validation against real operational volatility.")
 
 with t5:
     st.subheader("Reproducible inputs and honest limitations")
-    st.markdown("""**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Decision boundaries:** The replenishment engine is a budget-capped greedy heuristic. Carbon impacts are illustrative static factors, not verified life-cycle assessments. Forecast evaluation is a rolling one-step backtest.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
+    st.markdown("""**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
     d1, d2 = st.columns(2)
     with d1:
         st.download_button("Download example demand CSV", get_demo(today)[0].to_csv(index=False),
