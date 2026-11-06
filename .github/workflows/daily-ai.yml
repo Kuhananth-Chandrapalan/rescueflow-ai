@@ -103,7 +103,7 @@ jobs:
           file="${RUNNER_TEMP}/ai-proposal/changes.patch"
           test -s "$file"
           git apply --check "$file"
-          git apply "$file"
+          git apply --whitespace=fix "$file"
           python -m automation.guard_changes
           git diff --check
       - name: Install trusted dependencies for independent verification
