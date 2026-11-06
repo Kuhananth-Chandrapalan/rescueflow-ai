@@ -100,15 +100,26 @@ def train_and_forecast(history: pd.DataFrame, horizon: int = 14,
     test["predicted"] = predicted
     test["naive"] = test["mean_7"]
     scores = []
-    for sku, group in test.groupby("sku"):
+    for sku, group in test.groupby(
+        "sku"
+    ):
+        sku_test_residuals = group.units_sold - group.predicted
         scores.append({"sku": sku, "mae": float(mean_absolute_error(group.units_sold, group.predicted)),
                        "baseline_mae": float(mean_absolute_error(group.units_sold, group.naive)),
-                       "validation_days": len(group)})
+                       "validation_days": len(group),
+                       "residual_std": float(sku_test_residuals.std(ddof=1) if len(sku_test_residuals) > 1 else 1.0)})
+    residual_map = {}
+    for sku, group in test.groupby("sku"):
+        res = group.units_sold - group.predicted
+        p10 = float(np.percentile(res, 10))
+        p90 = float(np.percentile(res, 90))
+        residual_map[sku] = (p10, p90)
     forecasts = []
     for sku, group in data.groupby("sku"):
         sorted_group = group.sort_values("date")
         series = sorted_group.units_sold.astype(float).tolist()
         last_weather = sorted_group.iloc[-1]
+        p10, p90 = residual_map.get(sku, (-2.0, 2.0))
         for day in range(1, horizon + 1):
             date = end_date + pd.Timedelta(days=day)
             weather_row = weather.loc[weather.date == date] if weather is not None else pd.DataFrame()
@@ -121,7 +132,11 @@ def train_and_forecast(history: pd.DataFrame, horizon: int = 14,
                      "mean_7": float(np.mean(series[-7:]))}
             x = pd.DataFrame([{name: feats[name] for name in FEATURES}])
             value = max(0.0, float(model.predict(x)[0]))
+            horizon_scale = math.sqrt(day)
+            lower_bound = max(0.0, value + p10 * horizon_scale)
+            upper_bound = max(value, value + p90 * horizon_scale)
             forecasts.append({"date": date, "sku": sku, "predicted_units": value,
+                              "lower_units": lower_bound, "upper_units": upper_bound,
                               "temperature_c": temp, "source": "model projection"})
             series.append(value)
     importance = pd.DataFrame({"feature": FEATURES,
