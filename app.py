@@ -22,6 +22,7 @@ from rescueflow.forecast import train_and_forecast
 from rescueflow.report import impact_summary
 from rescueflow.validation import validate_pair
 from rescueflow.weather import get_weather
+from rescueflow.stockout import calculate_stockout_risk
 
 st.set_page_config(page_title="RescueFlow AI | Decision Intelligence", page_icon="🌱",
                    layout="wide", initial_sidebar_state="expanded")
@@ -114,6 +115,7 @@ try:
     forecasts = compute_predictions(history, forecast_days, temp_shift, weather)
     decisions = make_recommendations(catalog, forecasts.forecasts, budget, safety_days)
     summary = impact_summary(decisions, budget)
+    stockout_risk_df = calculate_stockout_risk(catalog, forecasts.forecasts)
 except Exception as exc:
     st.error(f"Forecast or decision engine failed: {exc}")
     st.stop()
@@ -122,19 +124,20 @@ if mode == "Synthetic demonstration":
     st.warning("**Demonstration data:** All demand, stock, costs and emissions factors are synthetic. Forecasts and operational recommendations must not be used as real business decisions without validation on real data.", icon="⚠️")
 
 kpis = st.columns(5)
+high_risk_count = int((stockout_risk_df.stockout_probability >= 0.75).sum())
 for col, label, value, help_text in zip(kpis,
     ["7-day demand", "Suggested units to order", "Order budget", "Rescue opportunity", "Stockout-risk SKUs"],
     [f"{summary['total_forecast_units']:,} units", f"{summary['order_units']:,} units",
      f"${summary['order_spend']:,.0f} / ${budget:,.0f}", f"{summary['donation_kg']:.1f} kg",
-     str(summary["high_risk_products"])],
+     str(high_risk_count)],
     ["*Sum over next 7 days", "Heuristic recommendations", "Estimated cost, not a purchase order",
-     "A conservative donation screening proxy", "Products with lead-time demand above stock"]):
+     "A conservative donation screening proxy", "SKUs with high stockout probability (>= 75%)"]):
     col.metric(label, value, help=help_text)
 
 st.caption("Demand and purchase planning totals cover 7 days; the forecast chart spans the selected 7–14 days. Currency values are illustrative USD equivalents, not live market prices.")
 
-t1, t2, t3, t4, t5 = st.tabs(["📈 Demand Intelligence", "🧭 Replenishment", "🥬 Food Rescue",
-                             "🧪 Model Quality", "📚 Data & Methodology"])
+t1, t2, t3, t4, t5, t6 = st.tabs(["📈 Demand Intelligence", "🧭 Replenishment", "⚠️ Stockout Risk", "🥬 Food Rescue",
+                                    "🧪 Model Quality", "📚 Data & Methodology"])
 
 with t1:
     left, right = st.columns([1.85, 1])
@@ -188,6 +191,18 @@ with t2:
     st.info("This is a decision-support heuristic—not an optimized procurement plan. Supplier pack sizes, real expiry batches, cold-chain constraints, and actual vendor prices are not yet modeled.")
 
 with t3:
+    st.subheader("Stockout Risk Scoring & Priority Badges")
+    st.caption("Calibrated proxy risk score estimating stockout probability before supplier lead-time replenishment arrives.")
+    risk_view = stockout_risk_df[["product", "category", "stock_units", "lead_days", "daily_demand", "lead_time_demand", "stockout_probability", "risk_badge"]].copy()
+    risk_view.columns = ["Product", "Category", "In Stock", "Lead (days)", "Demand/day", "Lead Demand", "Risk Probability", "Priority Badge"]
+    st.dataframe(risk_view, hide_index=True, use_container_width=True, column_config={
+        "Demand/day": st.column_config.NumberColumn(format="%.1f"),
+        "Lead Demand": st.column_config.NumberColumn(format="%.1f"),
+        "Risk Probability": st.column_config.NumberColumn(format="%.3f")
+    })
+    st.markdown('<div class="note"><strong>Probability Disclaimer & Interpretation:</strong> Stockout probabilities are calibrated heuristic proxy scores comparing current stock levels against expected lead-time demand. High Risk (>= 75%) indicates stock is likely to deplete before replenishment; Moderate Risk (40-74%) indicates tight margins; Secure (< 40%) indicates adequate buffer. Probabilities assume stationary demand and must not be used as guaranteed operational failure rates without physical warehouse auditing.</div>', unsafe_allow_html=True)
+
+with t4:
     st.subheader("Potential food rescue opportunities")
     st.caption("Donation screening only: inventory above expected demand before shelf-life expiry plus a safety buffer.")
     donation = decisions[decisions.donation_units > 0][["product", "category", "donation_units", "donation_kg", "avoided_co2_kg_proxy"]]
@@ -204,7 +219,7 @@ with t3:
     st.metric("Potential carbon impact (illustrative factor only)", f"{summary['proxy_co2_kg']:.1f} kg CO₂e")
     st.warning("Never donate solely based on this estimate. Inspect expiry dates, food handling, allergen labeling, beneficiary demand, transport, and local food-safety law.")
 
-with t4:
+with t5:
     st.subheader("Rolling one-day-ahead backtest and calibration")
     a, b, c = st.columns(3)
     a.metric("Model MAE (units/day)", f"{forecasts.metrics.mae.mean():.2f}")
@@ -222,9 +237,9 @@ with t4:
     st.plotly_chart(imp_fig, use_container_width=True)
     st.caption("Prediction intervals are constructed from empirical holdout residuals (10th to 90th quantiles) scaled by square-root time horizon. Coverage validity assumes stationary demand distributions and requires external validation against real operational volatility.")
 
-with t5:
+with t6:
     st.subheader("Reproducible inputs and honest limitations")
-    st.markdown("""**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
+    st.markdown("""**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
     d1, d2 = st.columns(2)
     with d1:
         st.download_button("Download example demand CSV", get_demo(today)[0].to_csv(index=False),

@@ -1,3 +1,4 @@
 [
-  "prediction-intervals"
+  "prediction-intervals",
+  "stockout-risk-scorer"
 ]
