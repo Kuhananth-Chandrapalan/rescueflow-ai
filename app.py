@@ -220,22 +220,28 @@ with t4:
     st.warning("Never donate solely based on this estimate. Inspect expiry dates, food handling, allergen labeling, beneficiary demand, transport, and local food-safety law.")
 
 with t5:
-    st.subheader("Rolling one-day-ahead backtest and calibration")
+    st.subheader("Rolling 1-day MAE vs True 7/14-Day Horizon Backtest")
     a, b, c = st.columns(3)
-    a.metric("Model MAE (units/day)", f"{forecasts.metrics.mae.mean():.2f}")
-    b.metric("7-day mean baseline MAE", f"{forecasts.metrics.baseline_mae.mean():.2f}")
-    improvement = (1 - forecasts.metrics.mae.mean() / forecasts.metrics.baseline_mae.mean()) * 100 if forecasts.metrics.baseline_mae.mean() > 0 else 0
-    c.metric("Improvement vs baseline", f"{improvement:+.1f}%")
+    a.metric("Rolling 1-day MAE", f"{forecasts.metrics.mae.mean():.2f} units")
+    b.metric("7-day Horizon MAE", f"{forecasts.multiday_metrics[forecasts.multiday_metrics.horizon == 7].multiday_mae.mean():.2f} units")
+    c.metric("14-day Horizon MAE", f"{forecasts.multiday_metrics[forecasts.multiday_metrics.horizon == 14].multiday_mae.mean():.2f} units")
+
+    st.markdown("### Detailed Horizon Performance Summary")
+    st.dataframe(forecasts.multiday_metrics, hide_index=True, use_container_width=True,
+                 column_config={"multiday_mae": st.column_config.NumberColumn(format="%.2f")})
+
+    st.markdown("### Rolling 1-Day vs Baseline Holdout Metrics")
     st.dataframe(forecasts.metrics, hide_index=True, use_container_width=True,
                  column_config={"mae": st.column_config.NumberColumn(format="%.2f"),
                                 "baseline_mae": st.column_config.NumberColumn(format="%.2f")})
+
     imp_fig = px.bar(forecasts.feature_importance.sort_values("importance"),
                      y="feature", x="importance", orientation="h", height=380,
                      labels={"importance": "Random forest feature importance", "feature": ""})
     imp_fig.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
                           plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=0, r=0, t=10, b=0))
     st.plotly_chart(imp_fig, use_container_width=True)
-    st.caption("Prediction intervals are constructed from empirical holdout residuals (10th to 90th quantiles) scaled by square-root time horizon. Coverage validity assumes stationary demand distributions and requires external validation against real operational volatility.")
+    st.markdown('<div class="note"><strong>Multi-Horizon Backtesting Interpretation & Limits:</strong> True 7- and 14-day horizon evaluations simulate historical cutoffs where multi-day forecasts are rolled out autoregressively using past predictions as lags. Error increases over longer horizons due to compounded error propagation. These evaluations assume stationary demand distributions and should be used alongside rolling 1-day MAE for comprehensive error tracking.</div>', unsafe_allow_html=True)
 
 with t6:
     st.subheader("Reproducible inputs and honest limitations")

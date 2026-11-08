@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from rescueflow.demo import demo_history
-from rescueflow.forecast import train_and_forecast, validate_history
+from rescueflow.forecast import train_and_forecast, validate_history, run_multiday_backtest
 
 
 def test_validation_rejects_duplicates():
@@ -44,3 +44,14 @@ def test_prediction_intervals_present_and_ordered():
 def test_horizon_guard():
     with pytest.raises(ValueError):
         train_and_forecast(demo_history(days=110), horizon=40)
+
+
+def test_multiday_backtest_execution():
+    data = demo_history(days=100)
+    mb = run_multiday_backtest(data, horizons=[7, 14])
+    assert isinstance(mb, pd.DataFrame)
+    assert not mb.empty
+    assert "horizon" in mb.columns
+    assert "multiday_mae" in mb.columns
+    assert set(mb.horizon.unique()).issubset({7, 14})
+    assert mb.multiday_mae.ge(0).all()

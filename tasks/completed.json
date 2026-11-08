@@ -1,4 +1,5 @@
 [
   "prediction-intervals",
-  "stockout-risk-scorer"
+  "stockout-risk-scorer",
+  "multi-horizon-backtest"
 ]
