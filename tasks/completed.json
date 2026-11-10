@@ -1,5 +1,6 @@
 [
   "prediction-intervals",
   "stockout-risk-scorer",
-  "multi-horizon-backtest"
+  "multi-horizon-backtest",
+  "holiday-calendar-features"
 ]
