@@ -23,6 +23,7 @@ from rescueflow.report import impact_summary
 from rescueflow.validation import validate_pair
 from rescueflow.weather import get_weather
 from rescueflow.stockout import calculate_stockout_risk
+from rescueflow.holiday import apply_holiday_and_promotion_scenario, DEFAULT_REGIONAL_HOLIDAYS
 
 st.set_page_config(page_title="RescueFlow AI | Decision Intelligence", page_icon="🌱",
                    layout="wide", initial_sidebar_state="expanded")
@@ -63,6 +64,13 @@ forecast_days = st.sidebar.slider("Planning horizon (days)", 7, 14, 14)
 budget = st.sidebar.slider("Replenishment budget ($)", 100, 3500, 1200, step=50)
 safety_days = st.sidebar.slider("Safety stock (days)", 0.0, 5.0, 1.5, step=0.5)
 temp_shift = st.sidebar.slider("Temperature scenario (°C)", -3.0, 5.0, 0.0, step=0.5)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("Regional Holiday & Promotion Scenarios")
+apply_holidays = st.sidebar.checkbox("Simulate regional holidays", value=False,
+                                    help="Applies standard regional festival demand multipliers.")
+holiday_multiplier = st.sidebar.slider("Holiday demand surge multiplier", 1.0, 2.0, 1.35, step=0.05)
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("Input data")
 mode = st.sidebar.radio("Data source", ["Synthetic demonstration", "Upload business CSVs"], index=0)
@@ -82,6 +90,9 @@ else:
         st.error(f"Unable to read CSV files: {exc}")
         st.stop()
 
+if apply_holidays:
+    history = apply_holiday_and_promotion_scenario(history, holiday_dates=DEFAULT_REGIONAL_HOLIDAYS, demand_multiplier=holiday_multiplier)
+
 try:
     history, catalog = validate_pair(history, catalog)
 except (ValueError, TypeError) as exc:
@@ -99,7 +110,9 @@ if use_weather:
             st.session_state["weather"] = weather
             st.sidebar.success("Weather forecast loaded")
         except Exception as exc:
-            st.sidebar.warning("Weather unavailable; using last observed weather")
+            st.sidebar.warning(
+                f"Weather unavailable; using last observed weather. Details: {exc}"
+            )
     weather = st.session_state.get("weather")
     if weather is not None and not weather.empty:
         st.sidebar.caption("Source: Open-Meteo, CC BY 4.0. Weather dates may not match a fixed synthetic demonstration period.")
@@ -143,8 +156,14 @@ with t1:
     left, right = st.columns([1.85, 1])
     with left:
         st.subheader("Forecast trajectory")
-        options = catalog.set_index("sku")["product"].to_dict()
-        selected = st.selectbox("Inspect SKU", list(options), format_func=lambda x: f"{options[x]}  ·  {x}")
+        options = catalog.set_index(
+            "sku"
+        )["product"].to_dict()
+        selected = st.selectbox(
+            "Inspect SKU",
+            list(options),
+            format_func=lambda x: f"{options[x]}  ·  {x}",
+        )
         past = history[history.sku == selected].sort_values("date").tail(45)
         future = forecasts.forecasts[forecasts.forecasts.sku == selected]
         fig = go.Figure()
@@ -245,7 +264,7 @@ with t5:
 
 with t6:
     st.subheader("Reproducible inputs and honest limitations")
-    st.markdown("""**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
+    st.markdown("""**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Regional Holiday & Promotion Scenarios:** Holiday scenarios apply deterministic multipliers to simulate surge demand during regional cultural and national events (e.g., New Year, May Day). These are illustrative scenario toggles, not guaranteed macroeconomic forecasts; actual consumer response varies.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
     d1, d2 = st.columns(2)
     with d1:
         st.download_button("Download example demand CSV", get_demo(today)[0].to_csv(index=False),
