@@ -121,7 +121,7 @@ with st.container():
     st.markdown("""<div class="hero">
       <div class="kicker">SUPPLY CHAIN / PREDICTIVE INTELLIGENCE</div>
       <h1>RescueFlow AI <span style="color:#77e8b8">/ Control Tower</span></h1>
-      <p>Forecast product demand, prioritize restocking within a fixed budget, and identify potential food rescue opportunities — with measurable model error and transparent reasoning.</p>
+      <p>Forecast product demand, prioritize restocking within a fixed budget under supplier pack sizing and minimum order constraints, and identify potential food rescue opportunities.</p>
     </div>""", unsafe_allow_html=True)
 
 try:
@@ -143,7 +143,7 @@ for col, label, value, help_text in zip(kpis,
     [f"{summary['total_forecast_units']:,} units", f"{summary['order_units']:,} units",
      f"${summary['order_spend']:,.0f} / ${budget:,.0f}", f"{summary['donation_kg']:.1f} kg",
      str(high_risk_count)],
-    ["*Sum over next 7 days", "Heuristic recommendations", "Estimated cost, not a purchase order",
+    ["*Sum over next 7 days", "Heuristic recommendations with pack sizes", "Estimated cost, not a purchase order",
      "A conservative donation screening proxy", "SKUs with high stockout probability (>= 75%)"]):
     col.metric(label, value, help=help_text)
 
@@ -169,7 +169,6 @@ with t1:
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=past.date, y=past.units_sold, name="Observed (synthetic)",
                                  line=dict(color="#76a7c9", width=2)))
-        # Prediction interval quantile bands (lower and upper)
         fig.add_trace(go.Scatter(x=future.date, y=future.upper_units,
                                  mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"))
         fig.add_trace(go.Scatter(x=future.date, y=future.lower_units,
@@ -195,19 +194,19 @@ with t1:
 
 with t2:
     st.subheader("Replenishment decision queue")
-    st.caption("Priority is based on expected avoidable shortage margin per dollar, constrained by available budget and approximate shelf life.")
+    st.caption("Priority is based on expected avoidable shortage margin per dollar, constrained by available budget, supplier pack sizes, and minimum order quantities (MOQ).")
     shown = decisions[["product", "category", "on_hand", "daily_prediction", "shortage_risk_units",
-                       "order_needed", "order_units", "order_cost", "reason"]].copy()
-    shown.columns = ["Product", "Category", "In stock", "Demand/day", "Lead-time shortage",
-                     "Wanted units", "Suggested order", "Est. spend ($)", "Why this recommendation"]
+                       "pack_size", "min_order_qty", "order_needed", "order_units", "order_cost", "reason"]].copy()
+    shown.columns = ["Product", "Category", "In stock", "Demand/day", "Lead shortage",
+                     "Pack", "MOQ", "Wanted units", "Suggested order", "Est. spend ($)", "Why this recommendation"]
     st.dataframe(shown, hide_index=True, use_container_width=True, column_config={
         "Demand/day": st.column_config.NumberColumn(format="%.1f"),
-        "Lead-time shortage": st.column_config.NumberColumn(format="%.1f"),
+        "Lead shortage": st.column_config.NumberColumn(format="%.1f"),
         "Est. spend ($)": st.column_config.NumberColumn(format="$%.2f")})
     st.download_button("Download replenishment plan (CSV)", data=shown.to_csv(index=False),
                        file_name="rescueflow_replenishment.csv", mime="text/csv")
     st.markdown(f"**Unspent simulated budget:** ${summary['budget_remaining']:,.2f}")
-    st.info("This is a decision-support heuristic—not an optimized procurement plan. Supplier pack sizes, real expiry batches, cold-chain constraints, and actual vendor prices are not yet modeled.")
+    st.info("Supplier pack sizes and minimum order quantities are enforced as integer multiples. Unspent budget reflects hard budget constraints.")
 
 with t3:
     st.subheader("Stockout Risk Scoring & Priority Badges")
@@ -264,7 +263,7 @@ with t5:
 
 with t6:
     st.subheader("Reproducible inputs and honest limitations")
-    st.markdown("""**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Regional Holiday & Promotion Scenarios:** Holiday scenarios apply deterministic multipliers to simulate surge demand during regional cultural and national events (e.g., New Year, May Day). These are illustrative scenario toggles, not guaranteed macroeconomic forecasts; actual consumer response varies.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
+    st.markdown("""**Supplier Pack Sizing & Minimum Orders:** Replenishment decisions incorporate supplier pack multiples (`pack_size`) and minimum order quantities (`min_order_qty`) subject to the hard budget cap. Orders are rounded up to integer pack sizes when positive, ensuring practical procurement feasibility while respecting budget limits.\n\n**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Regional Holiday & Promotion Scenarios:** Holiday scenarios apply deterministic multipliers to simulate surge demand during regional cultural and national events (e.g., New Year, May Day). These are illustrative scenario toggles, not guaranteed macroeconomic forecasts; actual consumer response varies.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit,pack_size,min_order_qty`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
     d1, d2 = st.columns(2)
     with d1:
         st.download_button("Download example demand CSV", get_demo(today)[0].to_csv(index=False),
