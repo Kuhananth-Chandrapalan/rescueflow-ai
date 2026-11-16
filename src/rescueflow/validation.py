@@ -5,7 +5,7 @@ import pandas as pd
 from .forecast import validate_history
 
 REQUIRED_CATALOG = {"sku", "product", "category", "shelf_life_days", "unit_cost", "unit_price",
-                    "lead_days", "stock_units", "co2_kg_per_unit", "kg_per_unit"}
+                    "lead_days", "stock_units", "co2_kg_per_unit", "kg_per_unit", "pack_size", "min_order_qty"}
 
 
 def validate_catalog(items: pd.DataFrame) -> pd.DataFrame:
@@ -16,13 +16,23 @@ def validate_catalog(items: pd.DataFrame) -> pd.DataFrame:
     if catalog.sku.isna().any() or catalog.sku.duplicated().any():
         raise ValueError("SKU identifiers must be present and unique")
     numerical = ["shelf_life_days", "unit_cost", "unit_price", "lead_days",
-                 "stock_units", "co2_kg_per_unit", "kg_per_unit"]
+                 "stock_units", "co2_kg_per_unit", "kg_per_unit", "pack_size", "min_order_qty"]
     for col in numerical:
         catalog[col] = pd.to_numeric(catalog[col], errors="raise")
-    if catalog[numerical].isna().any().any() or (catalog[numerical] < 0).any().any():
+    if catalog[numerical].isna().any().any():
+        raise ValueError("Inventory numerical values must be nonnegative and nonmissing")
+    if (catalog[numerical] < 0).any().any():
+        if (catalog["min_order_qty"] < 0).any():
+            raise ValueError("Minimum order quantity must be non-negative")
         raise ValueError("Inventory numerical values must be nonnegative and nonmissing")
     if (catalog.shelf_life_days < 1).any() or (catalog.unit_cost <= 0).any():
-        raise ValueError("Shelf life and unit cost must be positive")
+        raise ValueError(
+            "Shelf life and unit cost must be positive"
+        )
+    if (catalog.pack_size < 1).any():
+        raise ValueError("Supplier pack sizes must be at least 1 unit")
+    if (catalog.min_order_qty < 0).any():
+        raise ValueError("Minimum order quantity must be non-negative")
     return catalog
 
 

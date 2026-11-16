@@ -6,23 +6,23 @@ import pandas as pd
 
 
 CATALOG = [
-    ("BAN-01", "Bananas", "Produce", 4, 0.42, 0.82, 2, 290, 1.1, 0.16, 38),
-    ("TOM-02", "Tomatoes", "Produce", 6, 0.55, 1.15, 2, 58, 0.8, 0.20, 27),
-    ("BREAD-03", "Wholemeal bread", "Bakery", 4, 1.10, 2.10, 1, 160, 1.4, 0.5, 25),
-    ("MILK-04", "Fresh milk", "Dairy", 7, 0.90, 1.65, 2, 57, 1.8, 1.0, 31),
-    ("EGG-05", "Egg cartons", "Dairy", 19, 1.45, 2.55, 3, 48, 1.2, 0.7, 18),
-    ("LETT-06", "Lettuce", "Produce", 5, 0.70, 1.40, 2, 47, 0.6, 0.28, 23),
-    ("RICE-07", "Rice packs", "Pantry", 180, 1.25, 2.15, 5, 105, 1.7, 1.0, 13),
-    ("CHICK-08", "Chilled chicken", "Meat", 5, 3.05, 5.45, 2, 32, 5.5, 0.75, 15),
-    ("YOG-09", "Yogurt cups", "Dairy", 11, 0.35, 0.82, 2, 76, 1.4, 0.15, 33),
-    ("MANGO-10", "Mangoes", "Produce", 6, 0.95, 1.90, 3, 41, 1.0, 0.32, 20),
+    ("BAN-01", "Bananas", "Produce", 4, 0.42, 0.82, 2, 290, 1.1, 0.16, 38, 24, 48),
+    ("TOM-02", "Tomatoes", "Produce", 6, 0.55, 1.15, 2, 58, 0.8, 0.20, 27, 12, 24),
+    ("BREAD-03", "Wholemeal bread", "Bakery", 4, 1.10, 2.10, 1, 160, 1.4, 0.5, 25, 10, 20),
+    ("MILK-04", "Fresh milk", "Dairy", 7, 0.90, 1.65, 2, 57, 1.8, 1.0, 31, 15, 30),
+    ("EGG-05", "Egg cartons", "Dairy", 19, 1.45, 2.55, 3, 48, 1.2, 0.7, 18, 10, 20),
+    ("LETT-06", "Lettuce", "Produce", 5, 0.70, 1.40, 2, 47, 0.6, 0.28, 23, 12, 24),
+    ("RICE-07", "Rice packs", "Pantry", 180, 1.25, 2.15, 5, 105, 1.7, 1.0, 13, 20, 40),
+    ("CHICK-08", "Chilled chicken", "Meat", 5, 3.05, 5.45, 2, 32, 5.5, 0.75, 15, 5, 10),
+    ("YOG-09", "Yogurt cups", "Dairy", 11, 0.35, 0.82, 2, 76, 1.4, 0.15, 33, 20, 40),
+    ("MANGO-10", "Mangoes", "Produce", 6, 0.95, 1.90, 3, 41, 1.0, 0.32, 20, 10, 20),
 ]
 
 
 def inventory_catalog() -> pd.DataFrame:
     columns = ["sku", "product", "category", "shelf_life_days", "unit_cost",
                "unit_price", "lead_days", "stock_units", "co2_kg_per_unit",
-               "kg_per_unit", "base_daily_demand"]
+               "kg_per_unit", "base_daily_demand", "pack_size", "min_order_qty"]
     return pd.DataFrame(CATALOG, columns=columns)
 
 
