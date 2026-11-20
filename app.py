@@ -24,6 +24,7 @@ from rescueflow.validation import validate_pair
 from rescueflow.weather import get_weather
 from rescueflow.stockout import calculate_stockout_risk
 from rescueflow.holiday import apply_holiday_and_promotion_scenario, DEFAULT_REGIONAL_HOLIDAYS
+from rescueflow.warehouse import add_warehouse_stock, filter_warehouse_catalog
 
 st.set_page_config(page_title="RescueFlow AI | Decision Intelligence", page_icon="🌱",
                    layout="wide", initial_sidebar_state="expanded")
@@ -46,7 +47,9 @@ h1,h2,h3 {letter-spacing:-.03em;}
 
 @st.cache_data(show_spinner=False)
 def get_demo(as_of: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    return demo_history(as_of=as_of), inventory_catalog()
+    cat = inventory_catalog()
+    cat_multi = add_warehouse_stock(cat)
+    return demo_history(as_of=as_of), cat_multi
 
 @st.cache_data(show_spinner="Training demand model and backtesting...")
 def compute_predictions(history: pd.DataFrame, horizon: int, shift: float,
@@ -58,6 +61,11 @@ today = datetime.now(ZoneInfo("Asia/Colombo")).date().isoformat()
 
 st.sidebar.markdown("## 🌱 RescueFlow AI")
 st.sidebar.caption("FOOD SYSTEM DECISION INTELLIGENCE")
+st.sidebar.markdown("---")
+st.sidebar.subheader("Warehouse & Site Selection")
+warehouse_options = ["All Warehouses", "Central Warehouse", "North Hub", "South Hub"]
+selected_warehouse = st.sidebar.selectbox("Select warehouse / fulfillment node", warehouse_options, index=0)
+
 st.sidebar.markdown("---")
 st.sidebar.subheader("Scenario controls")
 forecast_days = st.sidebar.slider("Planning horizon (days)", 7, 14, 14)
@@ -76,7 +84,8 @@ st.sidebar.subheader("Input data")
 mode = st.sidebar.radio("Data source", ["Synthetic demonstration", "Upload business CSVs"], index=0)
 
 if mode == "Synthetic demonstration":
-    history, catalog = get_demo(today)
+    history, catalog_full = get_demo(today)
+    catalog = filter_warehouse_catalog(catalog_full, selected_warehouse)
     st.sidebar.success("Reproducible demo dataset")
 else:
     history_file = st.sidebar.file_uploader("Demand history (CSV)", type="csv")
@@ -85,7 +94,8 @@ else:
         st.info("Upload both the demand history and the inventory catalog, matching the sample schema in Data & Methodology.")
         st.stop()
     try:
-        history, catalog = pd.read_csv(history_file), pd.read_csv(stock_file)
+        history, catalog_full = pd.read_csv(history_file), pd.read_csv(stock_file)
+        catalog = filter_warehouse_catalog(catalog_full, selected_warehouse)
     except Exception as exc:
         st.error(f"Unable to read CSV files: {exc}")
         st.stop()
@@ -118,10 +128,10 @@ if use_weather:
         st.sidebar.caption("Source: Open-Meteo, CC BY 4.0. Weather dates may not match a fixed synthetic demonstration period.")
 
 with st.container():
-    st.markdown("""<div class="hero">
+    st.markdown(f"""<div class="hero">
       <div class="kicker">SUPPLY CHAIN / PREDICTIVE INTELLIGENCE</div>
-      <h1>RescueFlow AI <span style="color:#77e8b8">/ Control Tower</span></h1>
-      <p>Forecast product demand, prioritize restocking within a fixed budget under supplier pack sizing and minimum order constraints, and identify potential food rescue opportunities.</p>
+      <h1>RescueFlow AI <span style="color:#77e8b8">/ Control Tower ({selected_warehouse})</span></h1>
+      <p>Forecast product demand, prioritize restocking within a fixed budget under supplier pack sizing and minimum order constraints, and identify potential food rescue opportunities across warehouses.</p>
     </div>""", unsafe_allow_html=True)
 
 try:
@@ -193,7 +203,7 @@ with t1:
     st.markdown('<div class="note">Forecasts use a supervised random forest trained on prior demand, calendar and weather features. Shaded empirical quantile bands reflect historical holdout residual spreads scaled by horizon length. External validation is required before relying on intervals for safety stock.</div>', unsafe_allow_html=True)
 
 with t2:
-    st.subheader("Replenishment decision queue")
+    st.subheader(f"Replenishment decision queue ({selected_warehouse})")
     st.caption("Priority is based on expected avoidable shortage margin per dollar, constrained by available budget, supplier pack sizes, and minimum order quantities (MOQ).")
     shown = decisions[["product", "category", "on_hand", "daily_prediction", "shortage_risk_units",
                        "pack_size", "min_order_qty", "order_needed", "order_units", "order_cost", "reason"]].copy()
@@ -204,7 +214,7 @@ with t2:
         "Lead shortage": st.column_config.NumberColumn(format="%.1f"),
         "Est. spend ($)": st.column_config.NumberColumn(format="$%.2f")})
     st.download_button("Download replenishment plan (CSV)", data=shown.to_csv(index=False),
-                       file_name="rescueflow_replenishment.csv", mime="text/csv")
+                       file_name=f"rescueflow_replenishment_{selected_warehouse.lower().replace(' ', '_')}.csv", mime="text/csv")
     st.markdown(f"**Unspent simulated budget:** ${summary['budget_remaining']:,.2f}")
     st.info("Supplier pack sizes and minimum order quantities are enforced as integer multiples. Unspent budget reflects hard budget constraints.")
 
@@ -263,7 +273,7 @@ with t5:
 
 with t6:
     st.subheader("Reproducible inputs and honest limitations")
-    st.markdown("""**Supplier Pack Sizing & Minimum Orders:** Replenishment decisions incorporate supplier pack multiples (`pack_size`) and minimum order quantities (`min_order_qty`) subject to the hard budget cap. Orders are rounded up to integer pack sizes when positive, ensuring practical procurement feasibility while respecting budget limits.\n\n**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Regional Holiday & Promotion Scenarios:** Holiday scenarios apply deterministic multipliers to simulate surge demand during regional cultural and national events (e.g., New Year, May Day). These are illustrative scenario toggles, not guaranteed macroeconomic forecasts; actual consumer response varies.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit,pack_size,min_order_qty`. Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
+    st.markdown("""**Multi-Warehouse Stock View:** Inventory can be filtered across specific fulfillment warehouses (Central Warehouse, North Hub, South Hub) or viewed in aggregate. Single-warehouse CSV uploads are fully supported via backward-compatible fallback.\n\n**Supplier Pack Sizing & Minimum Orders:** Replenishment decisions incorporate supplier pack multiples (`pack_size`) and minimum order quantities (`min_order_qty`) subject to the hard budget cap. Orders are rounded up to integer pack sizes when positive, ensuring practical procurement feasibility while respecting budget limits.\n\n**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Regional Holiday & Promotion Scenarios:** Holiday scenarios apply deterministic multipliers to simulate surge demand during regional cultural and national events (e.g., New Year, May Day). These are illustrative scenario toggles, not guaranteed macroeconomic forecasts; actual consumer response varies.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit,pack_size,min_order_qty` (optional `warehouse`). Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
     d1, d2 = st.columns(2)
     with d1:
         st.download_button("Download example demand CSV", get_demo(today)[0].to_csv(index=False),

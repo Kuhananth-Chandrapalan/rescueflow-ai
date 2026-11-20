@@ -3,5 +3,6 @@
   "stockout-risk-scorer",
   "multi-horizon-backtest",
   "holiday-calendar-features",
-  "supplier-pack-sizing"
+  "supplier-pack-sizing",
+  "multi-location-stock"
 ]
