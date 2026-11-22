@@ -4,5 +4,6 @@
   "multi-horizon-backtest",
   "holiday-calendar-features",
   "supplier-pack-sizing",
-  "multi-location-stock"
+  "multi-location-stock",
+  "expiry-lot-priorities"
 ]
