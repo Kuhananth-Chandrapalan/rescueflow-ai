@@ -25,6 +25,7 @@ from rescueflow.weather import get_weather
 from rescueflow.stockout import calculate_stockout_risk
 from rescueflow.holiday import apply_holiday_and_promotion_scenario, DEFAULT_REGIONAL_HOLIDAYS
 from rescueflow.warehouse import add_warehouse_stock, filter_warehouse_catalog
+from rescueflow.anomaly import detect_demand_anomalies
 
 st.set_page_config(page_title="RescueFlow AI | Decision Intelligence", page_icon="🌱",
                    layout="wide", initial_sidebar_state="expanded")
@@ -139,6 +140,7 @@ try:
     decisions = make_recommendations(catalog, forecasts.forecasts, budget, safety_days)
     summary = impact_summary(decisions, budget)
     stockout_risk_df = calculate_stockout_risk(catalog, forecasts.forecasts)
+    anomaly_df = detect_demand_anomalies(history)
 except Exception as exc:
     st.error(f"Forecast or decision engine failed: {exc}")
     st.stop()
@@ -159,8 +161,8 @@ for col, label, value, help_text in zip(kpis,
 
 st.caption("Demand and purchase planning totals cover 7 days; the forecast chart spans the selected 7–14 days. Currency values are illustrative USD equivalents, not live market prices.")
 
-t1, t2, t3, t4, t5, t6 = st.tabs(["📈 Demand Intelligence", "🧭 Replenishment", "⚠️ Stockout Risk", "🥬 Food Rescue",
-                                    "🧪 Model Quality", "📚 Data & Methodology"])
+t1, t2, t3, t4, t5, t6, t7 = st.tabs(["📈 Demand Intelligence", "🧭 Replenishment", "⚠️ Stockout Risk", "🥬 Food Rescue",
+                                     "🔍 Demand Anomalies", "🧪 Model Quality", "📚 Data & Methodology"])
 
 with t1:
     left, right = st.columns([1.85, 1])
@@ -248,6 +250,18 @@ with t4:
     st.warning("Never donate solely based on this estimate. Inspect expiry dates, food handling, allergen labeling, beneficiary demand, transport, and local food-safety law.")
 
 with t5:
+    st.subheader("Historical Demand Anomaly Detection")
+    st.caption("Rolling historical baseline anomaly detection identifying unexpected sales surges or drops per SKU using robust moving z-scores.")
+    anomalies_filtered = anomaly_df[anomaly_df.sku.isin(catalog.sku)].copy()
+    anomaly_table = anomalies_filtered[["date", "sku", "units_sold", "expected_demand", "z_score", "anomaly_type", "anomaly_flag"]].sort_values("date", ascending=False)
+    st.dataframe(anomaly_table.head(100), hide_index=True, use_container_width=True, column_config={
+        "units_sold": st.column_config.NumberColumn(format="%.0f"),
+        "expected_demand": st.column_config.NumberColumn(format="%.1f"),
+        "z_score": st.column_config.NumberColumn(format="%.2f")
+    })
+    st.markdown('<div class="note"><strong>False-Positive Guidance & Interpretation:</strong> Anomalies flag historical values deviating significantly from the 14-day trailing moving average (Z >= 2.5). Common false positives include promotional events, regional holidays, sudden bulk wholesale purchases, or data entry corrections. Always cross-verify flags with local store managers and promotion logs before treating anomalies as supply chain failures.</div>', unsafe_allow_html=True)
+
+with t6:
     st.subheader("Rolling 1-day MAE vs True 7/14-Day Horizon Backtest")
     a, b, c = st.columns(3)
     a.metric("Rolling 1-day MAE", f"{forecasts.metrics.mae.mean():.2f} units")
@@ -271,9 +285,9 @@ with t5:
     st.plotly_chart(imp_fig, use_container_width=True)
     st.markdown('<div class="note"><strong>Multi-Horizon Backtesting Interpretation & Limits:</strong> True 7- and 14-day horizon evaluations simulate historical cutoffs where multi-day forecasts are rolled out autoregressively using past predictions as lags. Error increases over longer horizons due to compounded error propagation. These evaluations assume stationary demand distributions and should be used alongside rolling 1-day MAE for comprehensive error tracking.</div>', unsafe_allow_html=True)
 
-with t6:
+with t7:
     st.subheader("Reproducible inputs and honest limitations")
-    st.markdown("""**Multi-Warehouse Stock View:** Inventory can be filtered across specific fulfillment warehouses (Central Warehouse, North Hub, South Hub) or viewed in aggregate. Single-warehouse CSV uploads are fully supported via backward-compatible fallback.\n\n**Supplier Pack Sizing & Minimum Orders:** Replenishment decisions incorporate supplier pack multiples (`pack_size`) and minimum order quantities (`min_order_qty`) subject to the hard budget cap. Orders are rounded up to integer pack sizes when positive, ensuring practical procurement feasibility while respecting budget limits.\n\n**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Regional Holiday & Promotion Scenarios:** Holiday scenarios apply deterministic multipliers to simulate surge demand during regional cultural and national events (e.g., New Year, May Day). These are illustrative scenario toggles, not guaranteed macroeconomic forecasts; actual consumer response varies.\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit,pack_size,min_order_qty` (optional `warehouse`). Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
+    st.markdown("""**Multi-Warehouse Stock View:** Inventory can be filtered across specific fulfillment warehouses (Central Warehouse, North Hub, South Hub) or viewed in aggregate. Single-warehouse CSV uploads are fully supported via backward-compatible fallback.\n\n**Supplier Pack Sizing & Minimum Orders:** Replenishment decisions incorporate supplier pack multiples (`pack_size`) and minimum order quantities (`min_order_qty`) subject to the hard budget cap. Orders are rounded up to integer pack sizes when positive, ensuring practical procurement feasibility while respecting budget limits.\n\n**Source provenance:** Demo data generated deterministically; no genuine shop sales, donor inventory, or measured emissions are supplied. The optional Open-Meteo API is available for non-commercial demonstration only and requires attribution.\n\n**Stockout Risk Scoring:** Stockout risk is computed as a calibrated sigmoid proxy score measuring the likelihood that lead-time demand will exceed on-hand inventory. Priority badges (High Risk, Moderate Risk, Secure) provide visual triage but require physical inventory verification.\n\n**Regional Holiday & Promotion Scenarios:** Holiday scenarios apply deterministic multipliers to simulate surge demand during regional cultural and national events (e.g., New Year, May Day). These are illustrative scenario toggles, not guaranteed macroeconomic forecasts; actual consumer response varies.\n\n**Demand Anomaly Detection:** Uses historic rolling signals (14-day moving window) to compute z-scores without relying on external APIs. Interpretable flags guide human operators on false positives (promotions, data glitches, holidays).\n\n**Prediction intervals & Decision boundaries:** Empirical quantile bands estimate lower and upper demand ranges from holdout validation residuals, scaled across multi-day horizons. Because future supply chains involve shifting patterns, external validation is mandatory before relying on bands for safety buffer sizing. Carbon impacts are illustrative static factors, not verified life-cycle assessments.\n\n**Before real deployment:** Validate customer data, item-level expiry lots, supply constraints, actual lead times, availability of donations, real costs, privacy, bias, and food-safety requirements.\n\n**Minimum CSV schema:** Demand: `date,sku,units_sold,temperature_c,precip_mm,promotion`. Inventory: `sku,product,category,shelf_life_days,unit_cost,unit_price,lead_days,stock_units,co2_kg_per_unit,kg_per_unit,pack_size,min_order_qty` (optional `warehouse`). Requires 80+ consecutive daily rows per SKU and identical SKU sets.""")
     d1, d2 = st.columns(2)
     with d1:
         st.download_button("Download example demand CSV", get_demo(today)[0].to_csv(index=False),
@@ -281,7 +295,9 @@ with t6:
     with d2:
         st.download_button("Download example inventory CSV", get_demo(today)[1].to_csv(index=False),
                            "example_inventory.csv", "text/csv")
-    st.caption("Weather attribution: https://open-meteo.com/ — Open-Meteo weather data, CC BY 4.0.")
+    st.caption(
+        "Weather attribution: https://open-meteo.com/ — Open-Meteo weather data, CC BY 4.0."
+    )
 
 st.markdown("---")
 st.caption("RescueFlow AI · Demonstration / research prototype · All operational decisions require human review")
